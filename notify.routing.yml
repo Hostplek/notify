@@ -1,0 +1,7 @@
+notify.config:
+  path: '/admin/config/people/notify',
+  defaults:
+    _form: '\Drupal\notify\Form\NotfyAdminSettings'
+    _title: 'Notify Settings'
+  requirements:
+    _permission: 'administer notify'

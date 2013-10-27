@@ -383,14 +383,12 @@ function notify_menu() {
   $items = array();
 
   $items['admin/config/people/notify'] = array(
-    'title' => 'Notification settings',
-    'description' => 'Adjust settings for new content notifications sent by e-mail.',
-    'page callback' => 'drupal_get_form',
-    'page arguments' => array('notify_admin_settings'),
-    'access callback' => 'user_access',
-    'access arguments' => array('administer notify'),
+    'title' => 'Notify settings',
+    'description' => 'Adjust settings for emailed content notifications.',
+    'route_name' => 'notify.config',
     'type' => MENU_NORMAL_ITEM,
   );
+
   $items['admin/config/people/notify/settings'] = array(
     'title' => 'Settings',
     'type' => MENU_DEFAULT_LOCAL_TASK,
