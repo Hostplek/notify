@@ -1,5 +1,5 @@
 ------------------------
-NOTIFY 7.x MODULE README
+NOTIFY 8.x MODULE README
 ------------------------
 
 This is a simple notification module. It provides e-mail notifications to
@@ -21,7 +21,7 @@ INSTALLATION
 
 1. Extract the notify module directory, including all its
    subdirectories, into directory where you keep contributed modules
-   (e.g. sites/all/modules/).
+   (e.g. /modules/).
 
 2. Enable the notify module on the Modules list page.  The database
    tables will be created automagically for you at this point.
@@ -41,7 +41,7 @@ USAGE
 ------------------------
 
 The administrative interface is at: Administer >> Configuration >>
-People >> Notification settings.  The Settings tab is for setting how
+People >> Notify.  The Settings tab is for setting how
 often notifications are sent, and for selecting notification by note
 type.  The Users tab is to review and see per-user settings.
 
@@ -71,11 +71,10 @@ Ward Poelmans <wpoely86@gmail.com>,
 John Oltman <john.oltman@sitebasin.com>,
 Ajit Shinde (https://www.facebook.com/shinde.ajit), and 
 Gisle Hannemyr <gisle@hannemyr.no> contributed to the Drupal 7 port.
+Vincent Rommelaars <vincent@hostplek.nl> contributed to the Drupal 8 port.
 
 ------------------------
 RELATED PROJECTS & ALTERNATIVES
 ------------------------
 
-http://drupal.org/project/notify_by_views
-http://drupal.org/project/subscriptions
-http://drupal.org/project/notifications
+Currently none for Drupal 8
