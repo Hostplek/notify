@@ -61,10 +61,17 @@ function notify_cron() {
         list($num_sent, $num_fail) = _notify_send();
         $num_sent += $config->get('notify_num_sent', 0);
         $num_fail += $config->get('notify_num_failed', 0);
-        $config->set('notify_num_sent', $num_sent);
-        $config->set('notify_num_failed', $num_fail);
+//        $config->set('notify_num_sent', $num_sent);
+//        $config->set('notify_num_failed', $num_fail);
+//        $next = _notify_next_notificaton(\Drupal::time()->getRequestTime());
+//        $config->set('notify_cron_next', $next);
+
         $next = _notify_next_notificaton(\Drupal::time()->getRequestTime());
-        $config->set('notify_cron_next', $next);
+        \Drupal::configFactory()->getEditable('notify.settings')
+            ->set('notify_num_sent', $num_sent)
+            ->set('notify_num_failed', $num_fail)
+            ->set('notify_cron_next', $next)
+            ->save();
     }
 }
 
@@ -109,24 +116,26 @@ function notify_user_insert(&$edit, $account, $category) {
  * Implements hook_mail().
  */
 function notify_mail($key, &$message, $params) {
-//    print_r($params['user']);
     $config = \Drupal::config('notify.settings');
+    $siteconfig = \Drupal::config('system.site');
     $username = $params['user']->getDisplayName();
     $useruid = $params['user']->uid;
     $viewmode = $params['viewmode'];
-    $sitename = $config->get('site_name', 'Drupal');
+    $sitename = $siteconfig->get('name');
+    $sitemail = $siteconfig->get('mail');
     $upl = $params['user']->getPreferredLangcode();
+    $messagefrom = '"'. $sitename .'" <'. $sitemail .'>';
+//    print_r($sitemail);
 
     $message['headers']['MIME-Version'] = '1.0';
-    $message['headers']['Content-Type'] = 'text/plain;charset=utf-8';
+    $message['headers']['Content-Type'] = 'text/html;charset=utf-8';
+    $message['headers']['From'] = $message['headers']['Sender'] = $message['headers']['Return-Path'] = $message['headers']['Errors-To'] = $message['headers']['Reply-to'] = $messagefrom;
     $message['subject'] = t('New content notification for @username from @sitename', array(
         '@username' => $username,
         '@sitename' => $sitename,
     ), array('langcode' => $upl));
-    $message['body'][] = t('Greetings @user, this is a notification about new content from @sitename.', array(
-        '@user' => $username,
-        '@sitename' => $sitename,
-    ), array('langcode' => $upl));
+    $message['body'][] = \Drupal\Core\Render\Markup::create(t('Greetings @user,', array('@user' => $username,), array('langcode' => $upl)) . '<br /><br />');
+    $message['body'][] = \Drupal\Core\Render\Markup::create(t('this is a notification about new content from @sitename.', array('@sitename' => $sitename,), array('langcode' => $upl)) . '<br />');
     $fulltext = t('Click on the links below to see the whole node/comment.', array(), array('langcode' => $upl));
     if (0 == $viewmode) {
         $message['body'][] = t('This e-mail only lists the titles.', array(), array('langcode' => $upl)) . ' ' . $fulltext;
@@ -137,11 +146,11 @@ function notify_mail($key, &$message, $params) {
     else {
         $message['body'][] = t('The full text is included in this e-mail, but to see the original node, you can click on the links below.', array(), array('langcode' => $upl));
     }
-    $message['body'][] = $params['content'];
-    $message['body'][] = "-- \n" .
+    $message['body'][] = \Drupal\Core\Render\Markup::create($params['content']);
+    $message['body'][] = \Drupal\Core\Render\Markup::create("-- <br />" .
         t('This is an automatic e-mail from @sitename.',
-            array('@sitename' => $config->get('site_name', 'Drupal')), array('langcode' => $upl));
-//      . "\n" .
+            array('@sitename' => $siteconfig->get('name')), array('langcode' => $upl)));
+//      . "<br />" .
 //    t('To stop receiving these e-mails, change your notification preferences at @notify-url', array(
 //        '@notify-url' => url('user/' . $useruid . '/notify', array('absolute' => TRUE)),
 //    ), array('langcode' => $upl));
@@ -587,8 +596,8 @@ function _notify_send() {
     $user = \Drupal::currentUser();
     $config = \Drupal::config('notify.settings');
 
-    $separator = "------------------------------------------------------------------------------\n";
-    $mini_separator = "----\n";
+    $separator = "------------------------------------------------------------------------------<br />";
+    $mini_separator = "----<br />";
 
     $send_start = $config->get('notify_send_start', 0);
     $num_sent = 0;
@@ -803,7 +812,7 @@ function _notify_send() {
 //            '@author' => ($node->getOwner()->getDisplayName() ? $node->getOwner()->getDisplayName() : $config->get('anonymous', 'Anonymous')),
 //            '@update' => $update,
 //            '@status' => $status,
-//          ), array('langcode' => $upl)) . "\n";
+//          ), array('langcode' => $upl)) . "<br />";
 
                     $alias = \Drupal::languageManager()->isMultilingual() ? TRUE : FALSE;
                     $options = array(
@@ -816,7 +825,7 @@ function _notify_send() {
 
                     $node_body .= $link;
 
-                    $node_body .= _notify_content($node, NULL, $userrow['teasers']) . "\n";
+                    $node_body .= _notify_content($node, NULL, $userrow['teasers']) . "<br />";
                 }
 
                 // Prepend node e-mail header as long as user could access at
@@ -824,7 +833,7 @@ function _notify_send() {
                 if ($node_count > 0) {
                     $node_body = '<h3>' . t('Recent nodes - @count', array(
                             '@count' => \Drupal::translation()->formatPlural($node_count, '1 new post', '@count new posts', array(), array('langcode' => $upl)),
-                        ), array('langcode' => $upl)) . "\n" . '</h3>' . $node_body;
+                        ), array('langcode' => $upl)) . "<br />" . '</h3>' . $node_body;
                 }
             }
             // Consider new comments if user has permissions and comments are ready.
@@ -891,7 +900,7 @@ function _notify_send() {
                                 '@author' => ($commobj->getOwner()->getDisplayName() ? $commobj->getOwner()->getDisplayName() : \Drupal::config('anonymous', 'Anonymous')),
                                 '@status' => $status,
                             ), array('langcode' => $upl))
-                            . $link . "\n";
+                            . $link . "<br />";
 
                         $total_comment_count++;
                         $onecomment .= _notify_content($node, $commobj,  $userrow['teasers']);
@@ -908,14 +917,14 @@ function _notify_send() {
                                 '@type'  => $node->type->entity->label(),
                                 '@author' => $node->getOwner()->getDisplayName() ? $node->getOwner()->getDisplayName() : \Drupal::config('anonymous', 'Anonymous'),
                             ), array('langcode' => $upl)) . ' '
-                            . $shortlink . "\n";
+                            . $shortlink . "<br />";
                     }
                 }
 
                 if ($total_comment_count > 0) {
                     $comment_body = '<h3>' . t('Recent comments - @count', array(
                             '@count' => \Drupal::translation()->formatPlural($total_comment_count, '1 new comment', '@count new comments'),
-                        ), array('langcode' => $upl)) . "\n" . '</h3>' . $comment_body;
+                        ), array('langcode' => $upl)) . "<br />" . '</h3>' . $comment_body;
                 }
             }
 
@@ -927,7 +936,7 @@ function _notify_send() {
             if ($body) {
                 $watchdog_level = $config->get('notify_watchdog', 0);
 //                if (drupal_mail('notify', 'send', $userrow['mail'], user_preferred_language($userrow), array('content' => $body, 'user' => $userobj, 'viewmode' => $userrow['teasers']))) {
-                if (\Drupal::service('plugin.manager.mail')->mail('notify', 'send', $userrow['mail'], $upl, array('content' => $body, 'user' => $userobj, 'viewmode' => $userrow['teasers']))) {
+                if (\Drupal::service('plugin.manager.mail')->mail('notify', 'notice', $userrow['mail'], $upl, array('content' => $body, 'user' => $userobj, 'viewmode' => $userrow['teasers']), NULL, true)) {
                     if ($watchdog_level == 0) {
 //                        watchdog('notify', 'User %name (%mail) notified successfully.', array('%name' => $userrow['name'], '%mail' => $userrow['mail']), WATCHDOG_INFO);
                         \Drupal::logger('notify')->notice('User %name (%mail) notified successfully.', array('%name' => $userrow['name'], '%mail' => $userrow['mail']));

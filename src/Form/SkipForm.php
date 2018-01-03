@@ -31,7 +31,7 @@ class SkipForm extends ConfigFormBase {
      * {@inheritdoc}
      */
     public function buildForm(array $form, FormStateInterface $form_state, Request $request = NULL) {
-        $config = $this->config('your_module.settings');
+        $config = $this->config('notify.settings');
         // Fetch list of nodes and comments scheduled for notification
         list ($res_nodes, $res_comms, $res_nopub, $res_copub, $res_nounp, $res_counp) = _notify_select_content();
 
@@ -166,17 +166,20 @@ class SkipForm extends ConfigFormBase {
      */
     public function submitForm(array &$form, FormStateInterface $form_state) {
         $values = $form_state->getValues();
+        $form_values = $form_state->getCompleteForm();
 //        $this->config('notify.settings')
 //            ->set('your_message', $values['your_message'])
 //            ->save();
 
         $nodes = array();
         $comts = array();
-        if (isset($form_state['values']['entities']) && $form_state['values']['entities']) {
-            foreach ($form_state['values']['entities'] as $dist => $ii) {
+        if (isset($values['entities']) && $values['entities']) {
+            foreach ($values['entities'] as $dist => $ii) {
                 if ($ii['dist']) {
-                    $nid = $form_state['complete form']['entities'][$dist]['nid']['#markup'];
-                    $cid = $form_state['complete form']['entities'][$dist]['cid']['#markup'];
+//                    $nid = $form_state['complete form']['entities'][$dist]['nid']['#markup'];
+                    $nid = $form_values['entities'][$dist]['nid']['#markup'];
+//                    $cid = $form_state['complete form']['entities'][$dist]['cid']['#markup'];
+                    $cid = $form_values['entities'][$dist]['cid']['#markup'];
                     if ('-' == $cid) {
                         array_push($nodes, (int)$nid);
                     }
@@ -185,8 +188,13 @@ class SkipForm extends ConfigFormBase {
                     }
                 }
             }
-            variable_set('notify_skip_nodes', $nodes);
-            variable_set('notify_skip_comments', $comts);
+
+//            variable_set('notify_skip_nodes', $nodes);
+//            variable_set('notify_skip_comments', $comts);
+            $this->config('notify.settings')
+                ->set('notify_skip_nodes', $nodes)
+                ->set('notify_skip_comments', $comts)
+                ->save();
         }
 
         drupal_set_message(t('Skip flags saved.'));

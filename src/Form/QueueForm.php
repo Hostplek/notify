@@ -33,8 +33,12 @@ class QueueForm extends ConfigFormBase {
     public function buildForm(array $form, FormStateInterface $form_state, Request $request = NULL) {
         $config = $this->config('notify.settings');
 
+//        \Drupal::configFactory()->getEditable('notify.settings')
+//            ->set('notify_send_start', \Drupal::time()->getRequestTime())
+//            ->save();
+
         $period = $config->get('notify_period', 86400);
-        $since = $config->get('notify_send_last', \Drupal::time()->getRequestTime()) - $period;
+        $since = $config->get('notify_send_last', 0) - $period;
         $lastdate = \Drupal::service('date.formatter')->format($since, 'short');
         if (NULL !== ($config->get('notify_send_start'))) {
             $start = \Drupal::time()->getRequestTime();
@@ -42,11 +46,11 @@ class QueueForm extends ConfigFormBase {
             $start = $config->get('notify_send_start', 0);
         }
         $startdate = \Drupal::service('date.formatter')->format($start, 'short');
-        $notify_send_last  = $config->get('notify_send_last', \Drupal::time()->getRequestTime());
+        $notify_send_last  = $config->get('notify_send_last', 0);
         if (!isset($notify_send_last)) {
             $notify_send_last = \Drupal::time()->getRequestTime();
         }
-        $next_last = _notify_next_notificaton($notify_send_last, $config);
+        $next_last = _notify_next_notificaton($notify_send_last);
 
         if ($next_last == -1) {
             $batch_msg = t('No more notifications scheduled');
@@ -190,11 +194,6 @@ class QueueForm extends ConfigFormBase {
     public function submitForm(array &$form, FormStateInterface $form_state) {
         $config = $this->config('notify.settings');
         $values = $form_state->getValues();
-//        $this->config('notify.settings')
-//            ->set('notify_send_start', \Drupal::time()->getRequestTime())
-//            ->save();
-
-//        unset($form);
 
         $process= $values['process'];
         $notify_send_last = $config->get('notify_send_last', 0);
@@ -205,10 +204,8 @@ class QueueForm extends ConfigFormBase {
             $form_state->setRebuild();
             return;
         }
-//        $frform_string = \Drupal::service('date.formatter')->format($frform_send_last. 'short');
         if ($process < 2) {
             if ($notify_send_last != $frform_send_last) {
-//                form_set_error('notify_queue_settings', t('You must select &#8220;Override timestamp&#8221; to override the timestamp.'));
                 drupal_set_message(t('You must select &#8220;Override timestamp&#8221; to override the timestamp.'), 'error');
                 $form_state->setRebuild();
                 return;
@@ -216,7 +213,6 @@ class QueueForm extends ConfigFormBase {
         }
         elseif ($process == 2) {
             if ($notify_send_last == $frform_send_last) {
-//                form_set_error('notify_queue_settings', t('You selected &#8220;Override timestamp&#8221;, but the timestamp is not altered.'));
                 drupal_set_message(t('You selected &#8220;Override timestamp&#8221;, but the timestamp is not altered.'), 'error');
                 $form_state->setRebuild();
                 return;
@@ -245,64 +241,65 @@ class QueueForm extends ConfigFormBase {
             }
             else {
                 if ($watchdog_level <= 1) {
-//                    watchdog('notify', 'Notifications sent: @sent, failures: @fail.', array('@sent' => $num_sent, '@fail' => $num_fail), $watchdog_status);
                     \Drupal::logger('notify')->notice('Notifications sent: @sent, failures: @fail.', array('@sent' => $num_sent, '@fail' => $num_fail));
                 }
             }
             $num_sent += $config->get('notify_num_sent', 0);
             $num_fail += $config->get('notify_num_failed', 0);
-            $config->set('notify_num_sent', $num_sent);
-            $config->set('notify_num_failed', $num_fail);
+            \Drupal::configFactory()->getEditable('notify.settings')
+                ->set('notify_num_sent', $num_sent)
+                ->set('notify_num_failed', $num_fail)
+                ->set('notify_skip_nodes', array())
+                ->set('notify_skip_comments', array())
+                ->save();
+//            $config->set('notify_num_sent', $num_sent);
+//            $config->set('notify_num_failed', $num_fail);
         }
         elseif (1 == $values['process']) { // truncate
-            list ($res_nodes, $res_comms, $res_nopub, $res_copub, $res_nounp, $res_counp) = _notify_select_content($config);
+            list ($res_nodes, $res_comms, $res_nopub, $res_copub, $res_nounp, $res_counp) = _notify_select_content();
             foreach ($res_nopub as $row) {
-//                db_query('DELETE FROM {notify_unpublished_queue} WHERE cid = :cid AND nid = :nid', array(':cid' => 0, ':nid' => $row->nid));
                 $q = \Drupal::database()->delete('notify_unpublished_queue', 'n');
                 $q->condition('n.cid', 0);
                 $q->condition('n.nid', $row->nid);
                 $q->execute();
             }
             foreach ($res_copub as $row) {
-//                db_query('DELETE FROM {notify_unpublished_queue} WHERE cid = :cid AND nid = :nid', array(':cid' => $row->cid, ':nid' => $row->nid));
                 $q = \Drupal::database()->delete('notify_unpublished_queue', 'n');
                 $q->condition('n.cid', $row->cid);
                 $q->condition('n.nid', $row->nid);
                 $q->execute();
             }
 
-            $this->config('notify.settings')
-            ->set('notify_send_start', \Drupal::time()->getRequestTime())
-            ->set('notify_send_last', \Drupal::time()->getRequestTime())
-            ->set('notify_cron_next', 0)
-            ->set('notify_users', array())
-            ->save();
-//            $config->set('notify_send_start', REQUEST_TIME);
-//            $config->set('notify_send_last', REQUEST_TIME);
-//            $config->set('notify_cron_next', 0); // Force reset
-//            $config->set('notify_users', array());
+//            $this->config('notify.settings')
+            \Drupal::configFactory()->getEditable('notify.settings')
+                ->set('notify_send_start', \Drupal::time()->getRequestTime())
+                ->set('notify_send_last', \Drupal::time()->getRequestTime())
+                ->set('notify_cron_next', 0)
+                ->set('notify_users', array())
+                ->set('notify_skip_nodes', array())
+                ->set('notify_skip_comments', array())
+                ->save();
             drupal_set_message(t('The notification queue has been truncated. No e-mail were sent.'));
             if ($watchdog_level <= 1) {
-//                watchdog('notify', 'Notification queue truncated.', NULL, WATCHDOG_INFO);
                 \Drupal::logger('notify')->notice('Notification queue truncated.');
             }
             return;
         }
         elseif (2 == $values['process']) { // override
-            $date = strtotime($values['lastdate']);
-//            $config->set('notify_send_last', $date);
-//            print_r($date);
-            $config = $this->config('notify.settings');
-            $values = $form_state->getValues();
-            $this->config('notify.settings')
-                ->set('notify_send_last', $date)
+            $last_date = strtotime($values['lastdate']);
+//            $this->config('notify.settings')
+            \Drupal::configFactory()->getEditable('notify.settings')
+                ->set('notify_send_last', $last_date)
+                ->set('notify_skip_nodes', array())
+                ->set('notify_skip_comments', array())
                 ->save();
             drupal_set_message(t('Timestamp overridden'));
         }
-        $this->config('notify.settings')
-            ->set('notify_skip_nodes', 0)
-            ->set('notify_skip_comments', 0)
-            ->save();
+//        $this->config('notify.settings')
+//        \Drupal::configFactory()->getEditable('notify.settings')
+//            ->set('notify_skip_nodes', array())
+//            ->set('notify_skip_comments', array())
+//            ->save();
 //        $config->delete('notify_skip_nodes');
 //        $config->delete('notify_skip_comments');
     }
