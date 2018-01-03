@@ -140,7 +140,7 @@ class SettingsForm extends ConfigFormBase {
         $form['notify_settings']['notify_watchdog'] = array(
             '#type' => 'radios',
             '#title' => t('Watchdog log level'),
-            '#default_value' => $config->get('notify_watchdog', array(4)),
+            '#default_value' => $config->get('notify_watchdog', array(3)),
             '#options' => array(t('All'), t('Failures+Summary'), t('Failures'), t('Nothing')),
             '#description' => t('This setting lets you specify how much to log.'),
         );

@@ -45,7 +45,7 @@ class DefaultForm extends ConfigFormBase {
             '#type' => 'checkbox',
             '#title' => t('Receive e-mail notifications'),
             '#return_value' => 1,
-            '#default_value' => $config->get('notify_reg_default', 1),
+            '#default_value' => $config->get('notify_reg_default'),
         );
 
         $form['notify_defs'] = array(
@@ -58,7 +58,7 @@ class DefaultForm extends ConfigFormBase {
         $form['notify_defs']['node'] = array(
             '#type' => 'radios',
             '#title' => t('Notify new content'),
-            '#default_value' => $config->get('notify_def_node', 1),
+            '#default_value' => $config->get('notify_def_node'),
             '#options' => array(t('Disabled'), t('Enabled')),
             '#description' => t('Include new posts in the notification mail.'),
         );
@@ -66,14 +66,14 @@ class DefaultForm extends ConfigFormBase {
             '#type' => 'radios',
             '#access' => \Drupal::service('module_handler')->moduleExists('comment'),
             '#title' => t('Notify new comments'),
-            '#default_value' => $config->get('notify_def_comment', 0),
+            '#default_value' => $config->get('notify_def_comment'),
             '#options' => array(t('Disabled'), t('Enabled')),
             '#description' => t('Include new comments in the notification mail.'),
         );
         $form['notify_defs']['teasers'] = array(
             '#type' => 'radios',
             '#title' => t('How much to include?'),
-            '#default_value' => $config->get('notify_def_teasers', 0),
+            '#default_value' => $config->get('notify_def_teasers'),
             '#options' => array(
                 t('Title only'),
                 t('Title + Teaser/Excerpt'),
@@ -96,11 +96,17 @@ class DefaultForm extends ConfigFormBase {
             $nodetypes[$type] = $object->label();
         }
 
+        if (NULL !== ($config->get('notify_nodetypes'))) {
+            $def_nodetypes = $config->get('notify_nodetypes');
+        } else {
+            $def_nodetypes = array();
+        }
+
         $form[$set]['notify_nodetypes'] = array(
             '#type' => 'checkboxes',
             '#title' => 'Node types',
             '#options' => $nodetypes,
-            '#default_value' => $config->get('notify_nodetypes', 0),
+            '#default_value' => $def_nodetypes,
         );
         return parent::buildForm($form, $form_state);
     }
