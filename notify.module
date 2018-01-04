@@ -756,7 +756,7 @@ function _notify_send() {
                         $field = \Drupal::database()->select('notify_subscriptions', 'n')
                             ->fields('n', array('uid','type'))
                             ->condition('uid', $userrow['uid'])
-                            ->condition('type', $node->type)
+                            ->condition('type', $node->type->entity->label())
                             ->execute()->fetchObject();
                         $default = $field ? TRUE : FALSE;
                         if (!$default) {
