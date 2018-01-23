@@ -34,7 +34,7 @@ class QueueForm extends ConfigFormBase {
         $config = $this->config('notify.settings');
 
 //        \Drupal::configFactory()->getEditable('notify.settings')
-//            ->set('notify_send_start', \Drupal::time()->getRequestTime())
+//            ->set('notify_cron_next', \Drupal::time()->getRequestTime())
 //            ->save();
 
         $period = $config->get('notify_period', 86400);

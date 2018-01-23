@@ -34,7 +34,7 @@ function notify_help($path, $arg) {
  */
 function notify_cron() {
     $config = \Drupal::config('notify.settings');
-    $period = $config->get("notify_period", 86400);
+    $period = $config->get("notify_period");
     if (-2 == $period) {
         return;
     }
@@ -59,8 +59,8 @@ function notify_cron() {
 
     if ((\Drupal::time()->getRequestTime() > $next) || $doitp) {
         list($num_sent, $num_fail) = _notify_send();
-        $num_sent += $config->get('notify_num_sent', 0);
-        $num_fail += $config->get('notify_num_failed', 0);
+        $num_sent += $config->get('notify_num_sent');
+        $num_fail += $config->get('notify_num_failed');
 //        $config->set('notify_num_sent', $num_sent);
 //        $config->set('notify_num_failed', $num_fail);
 //        $next = _notify_next_notificaton(\Drupal::time()->getRequestTime());
@@ -95,21 +95,24 @@ function notify_form_user_register_form_alter(&$form, &$form_state, $form_id) {
 /**
  * Implements hook_user_insert().
  */
-function notify_user_insert(&$edit, $account, $category) {
+function notify_user_insert($account) {
     $config = \Drupal::config('notify.settings');
-    if (isset($edit['notify_decision']) && $edit['notify_decision'] == 1) {
-        \Drupal::database()->insert('notify')
-            ->fields(array(
-                'uid' => $account->uid,
-                'status' => 1,
-                'node' => $config->get('notify_def_node', 1),
-                'comment' => $config->get('notify_def_comment', 0),
-                'teasers' => $config->get('notify_def_teasers', 0),
-                'attempts' => 0,
-            ))
-            ->execute();
-        $edit['notify_decision'] = NULL;
-    }
+//    $user = \Drupal\user\Entity\User::load($account->id());
+//    kint($values);
+//    exit();
+//    if (isset($edit['notify_decision']) && $edit['notify_decision'] == 1) {
+//        \Drupal::database()->insert('notify')
+//            ->fields(array(
+//                'uid' => $account->id(),
+//                'status' => 1,
+//                'node' => $config->get('notify_def_node'),
+//                'comment' => $config->get('notify_def_comment'),
+//                'teasers' => $config->get('notify_def_teasers'),
+//                'attempts' => 0,
+//            ))
+//            ->execute();
+//        $edit['notify_decision'] = NULL;
+//    }
 }
 
 /**
@@ -426,7 +429,7 @@ function _notify_select_content() {
 
 function _notify_next_notificaton($send_last) {
     $config = \Drupal::config('notify.settings');
-    $period = $config->get('notify_period', 86400);
+    $period = $config->get('notify_period');
     // Two special cases: Never and instantly.
     if ($period < 0) {
         return(-1);
@@ -475,7 +478,7 @@ function _notify_user_reg_fields() {
     }
 
     // Get the variable for how often the notifications are sent out.
-    $period = $config->get("notify_period", 86400);
+    $period = $config->get("notify_period");
 
     // Add a fieldset containing a checkbox for users to accept
     // getting updates on the registration form.
@@ -711,6 +714,7 @@ function _notify_send() {
         }
 
         foreach ($uresult as $index => $userrow) {
+
             if (++$batchcount > $batchlimit) {
                 break;
             }
@@ -726,29 +730,35 @@ function _notify_send() {
             // $userrow['node']: user subscribes to nodes.
             // \Drupal::currentUser()->hasPermission('access content', $userobj): user allowed to view published
             // count($nodes): nodes are queued
-            if ($userrow['node'] && \Drupal::currentUser()->hasPermission('access content', $userobj) && count($nodes)) {
+
+            if ($userrow['node'] && $userobj->hasPermission('access content') && count($nodes)) {
 
                 $node_count = 0;
                 // Look at the node
                 foreach ($nodes as $node) {
+
                     // Skip to next if skip flag set for node.
                     if (in_array($node->id(), $notify_skip_nodes)){
                         continue;
                     }
                     // Skip to next if user is not allowed to view this node.
-                    if (!\Drupal::currentUser()->hasPermission('administer nodes', $userobj) && 0 == $node->isPublished()) {
+                    if (!$userobj->hasPermission('administer nodes') && 0 == $node->isPublished()) {
                         continue;
                     }
-                    if (!\Drupal::currentUser()->hasPermission('administer nodes', $userobj) && !in_array($node->type->entity->label(), $defaultlist)) {
+                    if (!$userobj->hasPermission('administer nodes') && !in_array($node->getType(), $defaultlist)) {
                         continue;
                     }
-                    if (!$config->get('notify_unpublished', 1) && 0 == $node->status) {
+
+                    if (!$config->get('notify_unpublished', 1) && 0 == $node->isPublished()) {
                         continue;
                     }
+//                    \Drupal::logger('notify')->notice('Notify var %var', array('%var' => $node->access('view', $userobj)));
+//                    print_r($node->access('view', $userobj));
                     //TODO: Fix access check to view node
 //                    if (!node_access('view', $node, $userobj)) {
-//                        continue;
-//                    }
+                    if (!$node->access('view', $userobj)) {
+                        continue;
+                    }
 
                     if (_notify_user_has_subscriptions($userrow['uid'])) {
                         // Custom subscriptions exists, use those.
@@ -756,7 +766,7 @@ function _notify_send() {
                         $field = \Drupal::database()->select('notify_subscriptions', 'n')
                             ->fields('n', array('uid','type'))
                             ->condition('uid', $userrow['uid'])
-                            ->condition('type', $node->type->entity->label())
+                            ->condition('type', $node->getType())
                             ->execute()->fetchObject();
                         $default = $field ? TRUE : FALSE;
                         if (!$default) {
@@ -765,7 +775,7 @@ function _notify_send() {
                     }
 
                     $ml_level = $config->get('notify_multilingual', 1);
-                    if (!\Drupal::currentUser()->hasPermission('administer notify')) {
+                    if (!$userobj->hasPermission('administer notify')) {
                         if ($ml_level && $node->tnid) {
                             if ($node->language != $upl) {
                                 continue;
@@ -801,7 +811,7 @@ function _notify_send() {
                     else {
                         $update = '';
                     }
-                    if (\Drupal::currentUser()->hasPermission('administer nodes', $userobj)) {
+                    if ($userobj->hasPermission('administer nodes')) {
                         $status = $node->isPublished() == 1 ? t('[Published]', array(), array('langcode' => $upl)) : t('[Unpublished]', array(), array('langcode' => $upl));
                     }
                     else {
@@ -840,7 +850,7 @@ function _notify_send() {
             // $userrow['comment']: user subscribes to nodes.
             // \Drupal::currentUser()->hasPermission('access comments', $userobj): user allowed to view published
             // count($comments): comments are queued
-            if ($userrow['comment'] && \Drupal::currentUser()->hasPermission('access comments', $userobj) && count($comments)) {
+            if ($userrow['comment'] && $userobj->hasPermission('access comments') && count($comments)) {
                 $total_comment_count = 0;
                 $node_comment_count = 0;
                 // Look at the comment
@@ -852,10 +862,9 @@ function _notify_send() {
                     else {
                         $node = \Drupal::entityTypeManager()->getStorage('node')->load($nid);
                     }
-                    //TODO: Fix access check to view node
-//                    if (!node_access('view', $node, $userobj)) {
-//                        continue;
-//                    }
+                    if (!$node->access('view', $userobj)) {
+                        continue;
+                    }
 
                     $comment_count = 0;
                     $onecomment = '';
@@ -864,17 +873,17 @@ function _notify_send() {
                         if (in_array($commobj->id(), $notify_skip_comments)){
                             continue;
                         }
-                        if (!\Drupal::currentUser()->hasPermission('administer comments', $userobj) && 1 == $commobj->isPublished()) {
+                        if (!$userobj->hasPermission('administer comments') && 0 == $commobj->isPublished()) {
                             continue;
                         }
-                        if (!\Drupal::currentUser()->hasPermission('administer comments', $userobj) && !in_array($node->type->entity->label(), $defaultlist)) {
+                        if (!$userobj->hasPermission('administer comments') && !in_array($node->getType(), $defaultlist)) {
                             continue;
                         }
                         if (!$config->get('notify_unpublished', 1) && 0 == $commobj->isPublished()) {
                             continue;
                         }
                         // Determine whether to show comment status.
-                        if (\Drupal::currentUser()->hasPermission('administer comments', $userobj)) {
+                        if ($userobj->hasPermission('administer comments')) {
                             $status = $commobj->isPublished() == 1 ? t('[Published]', array(), array('langcode' => $upl)) : t('[Unpublished]', array(), array('langcode' => $upl));
                         }
                         else {

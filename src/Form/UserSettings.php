@@ -40,7 +40,7 @@ class UserSettings extends ConfigFormBase {
         $user = \Drupal::currentUser();
         $userprofile = \Drupal::routeMatch()->getParameter('user');
 
-        if ($user->uid != $userprofile && !\Drupal::currentUser()->hasPermission('administer notify')) {
+        if ($user->id() != $userprofile && !\Drupal::currentUser()->hasPermission('administer notify')) {
             drupal_access_denied();
             return;
         }
@@ -53,8 +53,8 @@ class UserSettings extends ConfigFormBase {
 
 //        $result = db_query('SELECT u.uid, u.name, u.mail, n.status, n.node, n.teasers, n.comment FROM {users} u LEFT JOIN {notify} n ON u.uid = n.uid WHERE u.uid = :uid', array(':uid' => $account->uid));
         $result = \Drupal::database()->select('users', 'u');
-        $result->join('users_field_data', 'v', 'u.uid = v.uid');
-        $result->join('notify', 'n', 'v.uid = n.uid');
+        $result->leftjoin('users_field_data', 'v', 'u.uid = v.uid');
+        $result->leftjoin('notify', 'n', 'u.uid = n.uid');
         $result->fields('u', array('uid'));
         $result->fields('v', array('name','mail'));
         $result->fields('n', array('node','teasers', 'comment', 'status'));
